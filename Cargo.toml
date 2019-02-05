@@ -1,6 +1,6 @@
 [package]
 name = "fn-memo"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Jason Lee <jason5lee@hotmail.com>"]
 edition = "2018"
 description = "A library for creating the memoization of a function."
@@ -11,4 +11,13 @@ homepage = "https://crates.io/crates/fn-memo"
 keywords = ["cache", "memoization"]
 
 [dependencies]
-recur-fn = "0.1.0"
+recur-fn = "0.2.2"
+once_cell = { version = "0.1.7", optional = true }
+chashmap = { version = "2.2.0", optional = true }
+
+[features]
+default = ["sync"]
+sync = ["once_cell", "chashmap"]
+
+[workspace]
+members = ["fn-memo-example"]
