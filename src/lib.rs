@@ -93,181 +93,100 @@ pub trait FnMemo<Arg, Output> {
 #[cfg(test)]
 mod tests {
     use std::{sync::{Arc, RwLock}, thread, time};
-    use crate::{FnMemo, sync, unsync};
+    use crate::{FnMemo, unsync};
     use recur_fn::*;
+    #[cfg(feature = "sync")]
+    use crate::sync;
 
-    #[test]
-    fn unsync_memoize_works() {
+    fn test_unsync(memoizer: impl Fn(&DynRecurFn<usize, usize>, &Fn(&FnMemo<usize, usize>))) {
         let cnt = std::cell::RefCell::new(0);
-        let fib = unsync::memoize(recur_fn(|fib, n: usize| {
+        memoizer(&recur_fn(|fib, n: usize| {
             *cnt.borrow_mut() += 1;
             if n <= 1 {
                 n
             } else {
                 fib(n - 1) + fib(n - 2)
             }
-        }));
-
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.borrow());
-        assert_eq!(0, fib.call(0));
-        assert_eq!(1, fib.call(1));
-        assert_eq!(1, fib.call(2));
-        assert_eq!(2, fib.call(3));
-        assert_eq!(3, fib.call(4));
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.borrow());
+        }), &|fib| {
+            assert_eq!(5, fib.call(5));
+            assert_eq!(6, *cnt.borrow());
+            assert_eq!(0, fib.call(0));
+            assert_eq!(1, fib.call(1));
+            assert_eq!(1, fib.call(2));
+            assert_eq!(2, fib.call(3));
+            assert_eq!(3, fib.call(4));
+            assert_eq!(5, fib.call(5));
+            assert_eq!(6, *cnt.borrow());
+        });
+    }
+    #[test]
+    fn unsync_memoize_works() {
+        test_unsync(|f, callback| callback(&unsync::memoize(f)))
     }
 
     #[test]
     fn unsync_memoize_seq_works() {
-        let cnt = std::cell::RefCell::new(0);
-        let fib = unsync::memoize_seq(recur_fn(|fib, n: usize| {
-            *cnt.borrow_mut() += 1;
-            if n <= 1 {
-                n
-            } else {
-                fib(n - 1) + fib(n - 2)
-            }
-        }));
+        test_unsync(|f, callback| callback(&unsync::memoize_seq(f)))
+    }
 
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.borrow());
-        assert_eq!(0, fib.call(0));
-        assert_eq!(1, fib.call(1));
-        assert_eq!(1, fib.call(2));
-        assert_eq!(2, fib.call(3));
-        assert_eq!(3, fib.call(4));
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.borrow());
+    #[cfg(feature = "sync")]
+    fn test_sync(memoizer: impl Fn(Box<DynRecurFn<usize, usize> + Send + Sync>,
+    &Fn(Arc<FnMemo<usize, usize> + Send + Sync>))) {
+        let cnt = Arc::new(RwLock::new(0));
+        memoizer(Box::new({
+            let cnt = Arc::clone(&cnt);
+            recur_fn(move |fib, n: usize| {
+                thread::sleep(time::Duration::from_millis(50));
+                *cnt.write().unwrap() += 1;
+                if n <= 1 {
+                    n
+                } else {
+                    fib(n - 1) + fib(n - 2)
+                }
+            })
+        }), &|fib| {
+            assert_eq!(5, fib.call(5));
+            assert_eq!(6, *cnt.read().unwrap());
+            assert_eq!(1, fib.call(2));
+            assert_eq!(6, *cnt.read().unwrap());
+
+            fib.clear_cache();
+            *cnt.write().unwrap() = 0;
+
+            let mut threads = Vec::new();
+            let expects = [0, 1, 1, 2, 3, 5];
+            for arg in 0..=5 {
+                for _ in 0..10 {
+                    let test = Arc::clone(&fib);
+                    threads.push(thread::spawn(move || {
+                        assert_eq!(expects[arg], test.call(arg));
+                    }));
+                }
+            }
+
+            for thread in threads {
+                thread.join().unwrap()
+            }
+
+            assert_eq!(6, *cnt.read().unwrap());
+        })
     }
 
     #[cfg(feature = "sync")]
     #[test]
     fn sync_memoize_works() {
-        let cnt = Arc::new(RwLock::new(0));
-        let fib = Arc::new(sync::memoize({
-            let cnt = Arc::clone(&cnt);
-            recur_fn(move |fib, n: usize| {
-                thread::sleep(time::Duration::from_millis(50));
-                *cnt.write().unwrap() += 1;
-                if n <= 1 {
-                    n
-                } else {
-                    fib(n - 1) + fib(n - 2)
-                }
-            })
-        }));
-
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.read().unwrap());
-        assert_eq!(1, fib.call(2));
-        assert_eq!(6, *cnt.read().unwrap());
-
-        fib.clear_cache();
-        *cnt.write().unwrap() = 0;
-
-        let mut threads = Vec::new();
-        let expects = [0, 1, 1, 2, 3, 5];
-        for arg in 0..=5 {
-            for _ in 0..10 {
-                let test = Arc::clone(&fib);
-                threads.push(thread::spawn(move || {
-                    assert_eq!(expects[arg], test.call(arg));
-                }));
-            }
-        }
-
-        for thread in threads {
-            thread.join().unwrap()
-        }
-
-        assert_eq!(6, *cnt.read().unwrap());
+        test_sync(|f, callback| callback(Arc::new(sync::memoize(deref(f)))))
     }
     
     #[cfg(feature = "sync")]
     #[test]
     fn sync_memoize_rw_lock_works() {
-        let cnt = Arc::new(RwLock::new(0));
-        let fib = Arc::new(sync::memoize_rw_lock({
-            let cnt = Arc::clone(&cnt);
-            recur_fn(move |fib, n: usize| {
-                thread::sleep(time::Duration::from_millis(50));
-                *cnt.write().unwrap() += 1;
-                if n <= 1 {
-                    n
-                } else {
-                    fib(n - 1) + fib(n - 2)
-                }
-            })
-        }));
-
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.read().unwrap());
-        assert_eq!(1, fib.call(2));
-        assert_eq!(6, *cnt.read().unwrap());
-
-        fib.clear_cache();
-        *cnt.write().unwrap() = 0;
-
-        let mut threads = Vec::new();
-        let expects = [0, 1, 1, 2, 3, 5];
-        for arg in 0..=5 {
-            for _ in 0..10 {
-                let test = Arc::clone(&fib);
-                threads.push(thread::spawn(move || {
-                    assert_eq!(expects[arg], test.call(arg));
-                }));
-            }
-        }
-
-        for thread in threads {
-            thread.join().unwrap()
-        }
-
-        assert_eq!(6, *cnt.read().unwrap());
+        test_sync(|f, callback| callback(Arc::new(sync::memoize_rw_lock(deref(f)))))
     }
 
     #[cfg(feature = "sync")]
     #[test]
     fn sync_memoize_rw_lock_seq_works() {
-        let cnt = Arc::new(RwLock::new(0));
-        let fib = Arc::new(sync::memoize_rw_lock_seq({
-            let cnt = Arc::clone(&cnt);
-            recur_fn(move |fib, n: usize| {
-                thread::sleep(time::Duration::from_millis(50));
-                *cnt.write().unwrap() += 1;
-                if n <= 1 {
-                    n
-                } else {
-                    fib(n - 1) + fib(n - 2)
-                }
-            })
-        }));
-
-        assert_eq!(5, fib.call(5));
-        assert_eq!(6, *cnt.read().unwrap());
-        assert_eq!(1, fib.call(2));
-        assert_eq!(6, *cnt.read().unwrap());
-
-        fib.clear_cache();
-        *cnt.write().unwrap() = 0;
-
-        let mut threads = Vec::new();
-        let expects = [0, 1, 1, 2, 3, 5];
-        for arg in 0..=5 {
-            for _ in 0..10 {
-                let test = Arc::clone(&fib);
-                threads.push(thread::spawn(move || {
-                    assert_eq!(expects[arg], test.call(arg));
-                }));
-            }
-        }
-
-        for thread in threads {
-            thread.join().unwrap()
-        }
-
-        assert_eq!(6, *cnt.read().unwrap());
+        test_sync(|f, callback| callback(Arc::new(sync::memoize_rw_lock_seq(deref(f)))))
     }
 }
