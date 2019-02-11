@@ -1,6 +1,6 @@
-use std::cell::UnsafeCell;
-use recur_fn::RecurFn;
 use crate::FnMemo;
+use recur_fn::RecurFn;
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -21,7 +21,7 @@ pub trait Cache {
 }
 
 /// Use `HashMap` as `Cache`.
-impl <Arg: Clone + Eq + Hash, Output: Clone> Cache for HashMap<Arg, Output> {
+impl<Arg: Clone + Eq + Hash, Output: Clone> Cache for HashMap<Arg, Output> {
     type Arg = Arg;
     type Output = Output;
 
@@ -43,14 +43,14 @@ impl <Arg: Clone + Eq + Hash, Output: Clone> Cache for HashMap<Arg, Output> {
 }
 
 /// Use `Vec` as `Cache` for sequences.
-impl <Output: Clone> Cache for Vec<Option<Output>> {
+impl<Output: Clone> Cache for Vec<Option<Output>> {
     type Arg = usize;
     type Output = Output;
 
     fn new() -> Self {
         Vec::new()
     }
-    
+
     fn get(&self, arg: &usize) -> Option<&Output> {
         self.as_slice().get(*arg)?.as_ref()
     }
@@ -73,22 +73,28 @@ pub struct Memo<C, F> {
     f: F,
 }
 
-impl <C: Cache, F: RecurFn<C::Arg, C::Output>> Memo<C, F>
-where C::Arg: Clone, C::Output: Clone {
+impl<C: Cache, F: RecurFn<C::Arg, C::Output>> Memo<C, F>
+where
+    C::Arg: Clone,
+    C::Output: Clone,
+{
     /// Constructs a `Memo` using `C` as cache, caching function `f`.
     pub fn new(f: F) -> Memo<C, F> {
         Memo {
             cache: UnsafeCell::new(C::new()),
-            f
+            f,
         }
     }
 }
 
-impl <C: Cache, F: RecurFn<C::Arg, C::Output>> FnMemo<C::Arg, C::Output>
-for Memo<C, F> where C::Arg: Clone, C::Output: Clone {
+impl<C: Cache, F: RecurFn<C::Arg, C::Output>> FnMemo<C::Arg, C::Output> for Memo<C, F>
+where
+    C::Arg: Clone,
+    C::Output: Clone,
+{
     fn call(&self, arg: C::Arg) -> C::Output {
         if let Some(result) = unsafe { &*self.cache.get() }.get(&arg) {
-            return result.clone()
+            return result.clone();
         }
 
         let result = self.f.body(|arg| self.call(arg), arg.clone());
@@ -103,12 +109,19 @@ for Memo<C, F> where C::Arg: Clone, C::Output: Clone {
 
 /// Creates a memoization of `f` using `HashMap` as cache.
 pub fn memoize<Arg, Output, F>(f: F) -> impl FnMemo<Arg, Output>
-where Arg: Clone + Eq + Hash, Output: Clone, F: RecurFn<Arg, Output> {
+where
+    Arg: Clone + Eq + Hash,
+    Output: Clone,
+    F: RecurFn<Arg, Output>,
+{
     Memo::<std::collections::HashMap<_, _>, _>::new(f)
 }
 
 /// Creates a memoization of the sequence `f` using `Vec` as cache.
 pub fn memoize_seq<Output, F>(f: F) -> impl FnMemo<usize, Output>
-where Output: Clone, F: RecurFn<usize, Output> {
+where
+    Output: Clone,
+    F: RecurFn<usize, Output>,
+{
     Memo::<Vec<_>, _>::new(f)
 }
