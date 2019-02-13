@@ -1,9 +1,11 @@
+#[cfg(feature = "concurrent_hash_map")]
+pub mod chashmap;
+pub mod rw_lock;
+
 use crate::FnMemo;
-use chashmap::CHashMap;
 use once_cell::sync::OnceCell;
 use recur_fn::RecurFn;
-use std::hash::Hash;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 /// The cache for synchronized memoization.
 pub trait Cache {
@@ -20,107 +22,6 @@ pub trait Cache {
     fn get_or_new(&self, arg: Self::Arg) -> Arc<OnceCell<Self::Output>>;
     /// Clears the cache.
     fn clear(&self);
-}
-
-/// Use `CHashMap` as `Cache`.
-impl<Arg, Output> Cache for CHashMap<Arg, Arc<OnceCell<Output>>>
-where
-    Arg: PartialEq + Hash,
-{
-    type Arg = Arg;
-    type Output = Output;
-
-    fn new() -> Self {
-        CHashMap::new()
-    }
-
-    fn get(&self, arg: &Self::Arg) -> Option<Arc<OnceCell<Self::Output>>> {
-        self.get(arg).map(|arc| Arc::clone(&arc))
-    }
-
-    fn get_or_new(&self, arg: Self::Arg) -> Arc<OnceCell<Self::Output>> {
-        let cell = std::cell::UnsafeCell::new(unsafe { std::mem::uninitialized() });
-
-        self.upsert(
-            arg,
-            || {
-                let arc = Arc::new(OnceCell::INIT);
-                unsafe { std::ptr::write(cell.get(), Arc::clone(&arc)) };
-                arc
-            },
-            |arc| {
-                unsafe { std::ptr::write(cell.get(), Arc::clone(arc)) };
-            },
-        );
-
-        cell.into_inner()
-    }
-
-    fn clear(&self) {
-        self.clear();
-    }
-}
-
-use std::collections::HashMap;
-/// Use `HashMap` with `RwLock` as `Cache`.
-impl<Arg, Output> Cache for RwLock<HashMap<Arg, Arc<OnceCell<Output>>>>
-where
-    Arg: Eq + Hash,
-{
-    type Arg = Arg;
-    type Output = Output;
-
-    fn new() -> Self {
-        RwLock::new(HashMap::new())
-    }
-
-    fn get(&self, arg: &Self::Arg) -> Option<Arc<OnceCell<Self::Output>>> {
-        self.read().unwrap().get(arg).map(|arc| Arc::clone(arc))
-    }
-
-    fn get_or_new(&self, arg: Self::Arg) -> Arc<OnceCell<Self::Output>> {
-        Arc::clone(
-            self.write()
-                .unwrap()
-                .entry(arg)
-                .or_insert_with(|| Arc::new(OnceCell::INIT)),
-        )
-    }
-
-    fn clear(&self) {
-        self.write().unwrap().clear()
-    }
-}
-
-/// Use `Vec` with `RwLock` as `Cache` for sequences.
-impl<Output> Cache for RwLock<Vec<Arc<OnceCell<Output>>>> {
-    type Arg = usize;
-    type Output = Output;
-
-    fn new() -> Self {
-        RwLock::new(Vec::new())
-    }
-
-    fn get(&self, arg: &Self::Arg) -> Option<Arc<OnceCell<Self::Output>>> {
-        self.read().unwrap().get(*arg).map(|arc| Arc::clone(arc))
-    }
-
-    fn get_or_new(&self, arg: Self::Arg) -> Arc<OnceCell<Self::Output>> {
-        let mut write = self.write().unwrap();
-
-        if arg >= write.len() {
-            let delta: usize = arg + 1 - write.len();
-            write.reserve(delta);
-            while write.len() <= arg {
-                write.push(Arc::new(OnceCell::INIT));
-            }
-        }
-        Arc::clone(&write[arg])
-    }
-
-    fn clear(&self) {
-        self.write().unwrap().clear()
-    }
 }
 
 /// The synchronized implementation of `FnMemo`.
@@ -152,34 +53,4 @@ where
     fn clear_cache(&self) {
         self.cache.clear();
     }
-}
-
-/// Creates a synchronized memoization of `f` using `CHashMap` as cache.
-pub fn memoize<Arg, Output, F>(f: F) -> impl FnMemo<Arg, Output>
-where
-    Arg: Clone + PartialEq + Hash,
-    Output: Clone,
-    F: RecurFn<Arg, Output>,
-{
-    Memo::<CHashMap<_, _>, _>::new(f)
-}
-
-/// Creates a synchronized memoization of `f` using `HashMap` with `RwLock` as cache.
-pub fn memoize_rw_lock<Arg, Output, F>(f: F) -> impl FnMemo<Arg, Output>
-where
-    Arg: Clone + Eq + Hash,
-    Output: Clone,
-    F: RecurFn<Arg, Output>,
-{
-    Memo::<RwLock<HashMap<_, _>>, _>::new(f)
-}
-
-/// Creates a synchronized memoization of the sequence `f`
-/// using `Vec` with `RwLock` as cache.
-pub fn memoize_rw_lock_seq<Output, F>(f: F) -> impl FnMemo<usize, Output>
-where
-    Output: Clone,
-    F: RecurFn<usize, Output>,
-{
-    Memo::<RwLock<Vec<_>>, _>::new(f)
 }
