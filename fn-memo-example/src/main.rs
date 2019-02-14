@@ -1,26 +1,30 @@
-use fn_memo::{sync, unsync, FnMemo};
+use fn_memo::{
+    recur_fn::{direct, recur_fn},
+    sync::chashmap,
+    unsync, FnMemo,
+};
 use std::sync::Arc;
 use std::thread;
 
 fn unsync_example() {
-    let mul_2 = unsync::memoize(|n| {
+    let fib = unsync::memoize(recur_fn(|fib, n: usize| {
         println!("Evaluating {}", n);
-        n * 2
-    });
+        if n <= 1 {
+            n
+        } else {
+            fib(n - 1) + fib(n - 2)
+        }
+    }));
 
-    assert_eq!(0, mul_2.call(0)); // Output "Evaluating 0."
-    assert_eq!(4, mul_2.call(2)); // Output "Evaluating 2."
-    assert_eq!(10, mul_2.call(5)); // Output "Evaluating 5."
-    assert_eq!(4, mul_2.call(2)); // No output. The result is cached.
-    mul_2.clear_cache();
-    assert_eq!(4, mul_2.call(2)); // Output "Evaluating 2."
+    assert_eq!(55, fib.call(10));
+    assert_eq!(5, fib.call(5));
 }
 
 fn sync_example() {
-    let mul_2 = Arc::new(sync::memoize(|n| {
+    let mul_2 = Arc::new(chashmap::memoize(direct(|n| {
         println!("Evaluating {}", n);
         n * 2
-    }));
+    })));
 
     let mut threads = Vec::new();
     for _ in 0..4 {

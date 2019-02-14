@@ -18,7 +18,7 @@ pub trait Cache {
     /// This method should only acquire read lock if needed.
     fn get(&self, arg: &Self::Arg) -> Option<Arc<OnceCell<Self::Output>>>;
     /// Gets the cell of the `arg` in cache, creates if `arg` is not cached.
-    /// This method can acquire write lock if needed.
+    /// This method may acquire write lock if needed.
     fn get_or_new(&self, arg: Self::Arg) -> Arc<OnceCell<Self::Output>>;
     /// Clears the cache.
     fn clear(&self);

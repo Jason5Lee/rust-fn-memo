@@ -5,4 +5,4 @@ authors = ["Jason Lee <jason5lee@hotmail.com>"]
 edition = "2018"
 
 [dependencies]
-fn-memo = { path = "..", default-features = false }
+fn-memo = { path = ".." }

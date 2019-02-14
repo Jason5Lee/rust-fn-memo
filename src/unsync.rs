@@ -67,7 +67,7 @@ impl<Output: Clone> Cache for Vec<Option<Output>> {
     }
 }
 
-/// The single-thread implementation of `FnMemo`.
+/// The implementation of `FnMemo` for single-thread.
 pub struct Memo<C, F> {
     cache: UnsafeCell<C>,
     f: F,

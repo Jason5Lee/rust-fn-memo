@@ -48,24 +48,23 @@
 //! For the sequence (i.e. the function that takes an `usize` as argument),
 //! you can also use `unsync::memoize_seq`. It uses a `Vec` as a bucket
 //! to cache, so it has a better performance but takes the memory
-//! proportional to the largest argument of the cache.
+//! proportional to the largest argument that have cached.
 //!
 //! You can costumize the data structure of the cache by implementing
 //! `unsync::Cache` trait and create memoization with `unsync::Memo::new` method.
-//! For more details, see the documentation.
 //!
-//! The APIs under `unsync` namespace are for single-thread memoization.
-//! The result of `unsync::memoize` does not `Send` even the cached function does.
+//! The APIs under `unsync` namespace are for single-thread.
+//! The result of `unsync::memoize` does not `Sync` even the cached function does.
 //!
 //! ```compile_fail
 //! use std::{sync::Arc, thread};
-//! use fn_memo::{FnMemo, unsync};
+//! use fn_memo::{FnMemo, unsync, recur_fn::direct};
 //!
-//! let f = Arc::new(unsync::memoize(|n: i32| n));
+//! let f = Arc::new(unsync::memoize(direct(|n: i32| n)));
 //! thread::spawn(move || { f }); // Compile Error
 //! ```
 //!
-//! The synchronize version APIs are under `sync` namespace.
+//! The synchronized memoization APIs are under `sync` namespace.
 //!
 //! ```
 //! use fn_memo::{FnMemo, sync::chashmap, recur_fn::direct};
