@@ -15,7 +15,7 @@ Add this to your `Cargo.toml`:
 fn-memo = "1.1"
 ```
 
-By default `fn-memo` includes synchronized APIs, which introduces some extra dependencies. To disable synchronization to reduce the depdendencies, use following configuration.
+By default `fn-memo` includes synchronized APIs, which introduces related dependencies. If you have no need for synchronization and want to reduce depdendencies, use following configuration.
 
 ```toml
 [dependencies]
