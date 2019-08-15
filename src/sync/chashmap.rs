@@ -1,7 +1,9 @@
 use chashmap::CHashMap;
 use once_cell::sync::OnceCell;
 use recur_fn::RecurFn;
+use std::cell::UnsafeCell;
 use std::hash::Hash;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 /// Use `CHashMap` as `Cache`.
@@ -21,21 +23,27 @@ where
     }
 
     fn get_or_new(&self, arg: Self::Arg) -> Arc<OnceCell<Self::Output>> {
-        let cell = std::cell::UnsafeCell::new(unsafe { std::mem::uninitialized() });
+        // `cell` stores a clone of the `Arc` in cache.
+        // `UnsafeCell<MaybeUninit<_>>` is used here because I assume
+        // the `upsert` call below will execute exactly one of its
+        // `insert` or `update` parameter, which means, `cell` will be written, and only
+        // be written once. So it's safe.
+        let cell: UnsafeCell<MaybeUninit<Arc<OnceCell<Output>>>> =
+            UnsafeCell::new(MaybeUninit::uninit());
 
         self.upsert(
             arg,
             || {
-                let arc = Arc::new(OnceCell::INIT);
-                unsafe { std::ptr::write(cell.get(), Arc::clone(&arc)) };
+                let arc = Arc::new(OnceCell::new());
+                unsafe { (*cell.get()).as_mut_ptr().write(Arc::clone(&arc)) };
                 arc
             },
             |arc| {
-                unsafe { std::ptr::write(cell.get(), Arc::clone(arc)) };
+                unsafe { (*cell.get()).as_mut_ptr().write(Arc::clone(arc)) };
             },
         );
 
-        cell.into_inner()
+        unsafe { cell.into_inner().assume_init() }
     }
 
     fn clear(&self) {

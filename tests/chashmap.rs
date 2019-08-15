@@ -1,8 +1,8 @@
 mod sync;
 
 use fn_memo::sync::chashmap;
-use std::sync::Arc;
 use recur_fn::from_pointer;
+use std::sync::Arc;
 
 #[test]
 fn memoize_works() {

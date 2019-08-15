@@ -25,7 +25,7 @@ where
             self.write()
                 .unwrap()
                 .entry(arg)
-                .or_insert_with(|| Arc::new(OnceCell::INIT)),
+                .or_insert_with(|| Arc::new(OnceCell::new())),
         )
     }
 
@@ -64,7 +64,7 @@ impl<Output> super::Cache for RwLock<Vec<Arc<OnceCell<Output>>>> {
             let delta: usize = arg + 1 - write.len();
             write.reserve(delta);
             while write.len() <= arg {
-                write.push(Arc::new(OnceCell::INIT));
+                write.push(Arc::new(OnceCell::new()));
             }
         }
         Arc::clone(&write[arg])
