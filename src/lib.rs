@@ -21,8 +21,8 @@
 //! ```
 //!
 //! The `memoize` function takes a `RecurFn` argument,
-//! which allows you to memoize a recursive function and each recursion
-//! result will be cached. See
+//! which allows you to memoize a recursive function and the result of
+//! each recursion will be cached. See
 //! [the API reference of `recur-fn`](https://docs.rs/recur-fn/)
 //! for details.
 //!
@@ -45,9 +45,9 @@
 //! The code above will output the evaluation from 0 to 10.
 //! Each of them is outputed only once.
 //!
-//! For the sequence (i.e. the function that takes an `usize` as argument),
+//! For the sequence (i.e. the function that takes an `usize` argument),
 //! you can also use `unsync::memoize_seq`. It uses a `Vec` as a bucket
-//! to cache, so it has a better performance but takes the memory
+//! to cache. It has a better performance and requires the memory
 //! proportional to the largest argument that have cached.
 //!
 //! You can costumize the data structure of the cache by implementing
@@ -103,7 +103,7 @@ pub use recur_fn;
 /// The memoized function.
 pub trait FnMemo<Arg, Output> {
     /// Calls the function. If the result of `arg` is already cached,
-    /// it will return the cached result, otherwise, it caculates the result
+    /// it will return the cached result, otherwise, it calculates the result
     /// and adds it to the cache.
     fn call(&self, arg: Arg) -> Output;
     /// Clears the cache.

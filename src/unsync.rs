@@ -11,8 +11,8 @@ pub trait Cache {
 
     /// Create an empty cache.
     fn new() -> Self;
-    /// Gets the cached result of `arg`. If it is not cached,
-    /// returns `None`.
+    /// Gets the cached result of `arg`.
+    /// If it is not cached, returns `None`.
     fn get(&self, arg: &Self::Arg) -> Option<&Self::Output>;
     /// Caches the `arg` with `result`.
     fn cache(&mut self, arg: Self::Arg, result: Self::Output);

@@ -1,7 +1,7 @@
 use fn_memo::{unsync, FnMemo};
 use recur_fn::*;
 
-fn test_unsync(memoizer: impl Fn(&DynRecurFn<usize, usize>, &Fn(&FnMemo<usize, usize>))) {
+fn test_unsync(memoizer: impl Fn(&dyn DynRecurFn<usize, usize>, &dyn Fn(&dyn FnMemo<usize, usize>))) {
     let cnt = std::cell::RefCell::new(0);
     memoizer(
         &recur_fn(|fib, n: usize| {
@@ -28,10 +28,10 @@ fn test_unsync(memoizer: impl Fn(&DynRecurFn<usize, usize>, &Fn(&FnMemo<usize, u
 
 #[test]
 fn memoize_works() {
-    test_unsync(|f, callback| callback(&unsync::memoize(f)))
+    test_unsync(|f, callback| callback(&unsync::memoize(from_pointer(f))))
 }
 
 #[test]
 fn emoize_seq_works() {
-    test_unsync(|f, callback| callback(&unsync::memoize_seq(f)))
+    test_unsync(|f, callback| callback(&unsync::memoize_seq(from_pointer(f))))
 }

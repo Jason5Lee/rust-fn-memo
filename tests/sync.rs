@@ -7,8 +7,8 @@ use std::{
 
 pub fn test_sync(
     memoizer: impl Fn(
-        Box<DynRecurFn<usize, usize> + Send + Sync>,
-        &Fn(Arc<FnMemo<usize, usize> + Send + Sync>),
+        Box<dyn DynRecurFn<usize, usize> + Send + Sync>,
+        &dyn Fn(Arc<dyn FnMemo<usize, usize> + Send + Sync>),
     ),
 ) {
     let cnt = Arc::new(RwLock::new(0));
